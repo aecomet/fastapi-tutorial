@@ -1,4 +1,4 @@
-from main import build_hello_message
+from app.services.hello import build_hello_message
 
 
 def test_build_hello_message_default():
