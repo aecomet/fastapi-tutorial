@@ -160,11 +160,10 @@ livenessProbe:
 
 ## 起動方法
 
-| 環境 | コマンド | 特徴 |
-|------|---------|------|
-| 本番 | `docker compose up -d` | ビルド済みイメージで起動 |
-| 開発 | `docker compose --profile dev up api-dev` | ホットリロード・ボリュームマウント |
-| ローカル | `uv run uvicorn main:app --reload` | Docker 不要 |
+| 環境 | コマンド |
+|------|---------|
+| Docker | `docker compose up` |
+| ローカル | `uv run uvicorn main:app --reload` |
 
 
 ## コンポーネント構成

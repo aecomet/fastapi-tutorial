@@ -15,17 +15,11 @@ cd fastapi-tutorial
 
 ## サーバー起動
 
-### 本番モード
-
 ```bash
-docker compose up -d
+docker compose up
 ```
 
-### 開発モード（ホットリロード）
-
-```bash
-docker compose --profile dev up api-dev
-```
+ホットリロード対応のため、コードの変更は自動的に反映されます。
 
 ## 動作確認
 
