@@ -17,9 +17,9 @@ def test_build_root_response_has_routes():
 def test_routes_include_health_endpoints():
     """ROUTES にヘルスチェックエンドポイントが含まれること"""
     paths = [r.path for r in ROUTES]
-    assert "/health/startup" in paths
-    assert "/health/readiness" in paths
-    assert "/health/liveness" in paths
+    assert "/api/v1/health/startup" in paths
+    assert "/api/v1/health/readiness" in paths
+    assert "/api/v1/health/liveness" in paths
 
 
 def test_routes_include_docs():

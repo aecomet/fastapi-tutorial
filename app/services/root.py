@@ -13,10 +13,10 @@ class RootResponse(BaseModel):
 
 
 ROUTES: list[RouteInfo] = [
-    RouteInfo(path="/", method="GET", description="このページ"),
-    RouteInfo(path="/health/startup", method="GET", description="K8s startupProbe"),
-    RouteInfo(path="/health/readiness", method="GET", description="K8s readinessProbe"),
-    RouteInfo(path="/health/liveness", method="GET", description="K8s livenessProbe"),
+    RouteInfo(path="/api/v1/", method="GET", description="このページ"),
+    RouteInfo(path="/api/v1/health/startup", method="GET", description="K8s startupProbe"),
+    RouteInfo(path="/api/v1/health/readiness", method="GET", description="K8s readinessProbe"),
+    RouteInfo(path="/api/v1/health/liveness", method="GET", description="K8s livenessProbe"),
     RouteInfo(
         path="/docs",
         method="GET",
