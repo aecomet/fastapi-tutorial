@@ -1,20 +1,28 @@
-from app.services.hello import build_hello_message
+from app.services.root import ROUTES, RootResponse, build_root_response
 
 
-def test_build_hello_message_default():
-    """引数なしで 'Hello World' を返すこと"""
-    result = build_hello_message()
-    assert result == {"message": "Hello World"}
+def test_build_root_response_message():
+    """build_root_response が 'Hello World' メッセージを返すこと"""
+    result = build_root_response()
+    assert isinstance(result, RootResponse)
+    assert result.message == "Hello World"
 
 
-def test_build_hello_message_with_name():
-    """name を指定すると 'Hello {name}' を返すこと"""
-    result = build_hello_message("FastAPI")
-    assert result == {"message": "Hello FastAPI"}
+def test_build_root_response_has_routes():
+    """build_root_response がルート一覧を含むこと"""
+    result = build_root_response()
+    assert len(result.routes) > 0
 
 
-def test_build_hello_message_returns_dict():
-    """戻り値が dict であること"""
-    result = build_hello_message()
-    assert isinstance(result, dict)
-    assert "message" in result
+def test_routes_include_health_endpoints():
+    """ROUTES にヘルスチェックエンドポイントが含まれること"""
+    paths = [r.path for r in ROUTES]
+    assert "/health/startup" in paths
+    assert "/health/readiness" in paths
+    assert "/health/liveness" in paths
+
+
+def test_routes_include_docs():
+    """ROUTES に Swagger UI へのリンクが含まれること"""
+    paths = [r.path for r in ROUTES]
+    assert "/docs" in paths

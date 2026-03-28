@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 
-from app.services.hello import build_hello_message
+from app.services.root import RootResponse, build_root_response
 
 router = APIRouter()
 
 
-@router.get("/")
-def read_root() -> dict:
-    return build_hello_message()
+@router.get("/", response_model=RootResponse)
+def read_root() -> RootResponse:
+    return build_root_response()

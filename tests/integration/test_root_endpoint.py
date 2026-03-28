@@ -11,10 +11,22 @@ def client():
 
 
 def test_read_root_returns_hello_world(client: TestClient):
-    """GET / が Hello World を返すこと"""
+    """GET / が Hello World メッセージとルート一覧を返すこと"""
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello World"}
+    body = response.json()
+    assert body["message"] == "Hello World"
+    assert isinstance(body["routes"], list)
+    assert len(body["routes"]) > 0
+
+
+def test_read_root_contains_health_routes(client: TestClient):
+    """GET / のルート一覧にヘルスチェックエンドポイントが含まれること"""
+    response = client.get("/")
+    paths = [r["path"] for r in response.json()["routes"]]
+    assert "/health/startup" in paths
+    assert "/health/readiness" in paths
+    assert "/health/liveness" in paths
 
 
 def test_read_root_content_type_is_json(client: TestClient):

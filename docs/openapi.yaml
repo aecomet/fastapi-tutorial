@@ -1,0 +1,132 @@
+openapi: "3.1.0"
+
+info:
+  title: fastapi-tutorial
+  version: "0.1.0"
+  description: FastAPI の学習用チュートリアル API
+
+servers:
+  - url: http://127.0.0.1:8000
+    description: 開発サーバー
+
+tags:
+  - name: root
+    description: アプリケーションルートエンドポイント
+  - name: health
+    description: K8s ヘルスチェックエンドポイント
+
+paths:
+  /:
+    get:
+      tags:
+        - root
+      summary: Hello World
+      description: Hello World メッセージを返す。
+      operationId: read_root
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Hello World
+              example:
+                message: Hello World
+
+  /health/startup:
+    get:
+      tags:
+        - health
+      summary: Startup probe
+      description: |
+        アプリケーションの起動完了を確認する。
+        lifespan イベントが完了していれば 200、未完了であれば 503 を返す。
+        K8s の `startupProbe` に使用する。
+      operationId: startup_probe
+      responses:
+        "200":
+          description: 起動完了
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                detail: Application startup complete
+        "503":
+          description: 起動未完了
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+              example:
+                detail: Application is still starting up
+
+  /health/readiness:
+    get:
+      tags:
+        - health
+      summary: Readiness probe
+      description: |
+        アプリケーションがトラフィックを受け付けられる状態かを確認する。
+        K8s の `readinessProbe` に使用する。
+      operationId: readiness_probe
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                detail: Application is ready
+
+  /health/liveness:
+    get:
+      tags:
+        - health
+      summary: Liveness probe
+      description: |
+        アプリケーションが生存しているかを確認する。
+        K8s の `livenessProbe` に使用する。
+      operationId: liveness_probe
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                detail: Application is alive
+
+components:
+  schemas:
+    HealthStatus:
+      type: string
+      enum:
+        - ok
+        - degraded
+      title: HealthStatus
+
+    HealthResponse:
+      type: object
+      title: HealthResponse
+      required:
+        - status
+        - detail
+      properties:
+        status:
+          $ref: "#/components/schemas/HealthStatus"
+        detail:
+          type: string
+          title: Detail

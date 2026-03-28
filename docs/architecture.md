@@ -42,35 +42,7 @@
 
 ## ファイル構成
 
-```
-fastapi-tutorial/
-├── .github/
-│   ├── copilot-instructions.md      # Copilot 共通指示
-│   └── instructions/
-│       └── fastapi-review.instructions.md  # レビュー観点
-├── app/
-│   ├── __init__.py
-│   ├── main.py                      # FastAPI アプリ本体・lifespan 定義
-│   ├── routers/
-│   │   ├── __init__.py
-│   │   ├── root.py                  # GET / エンドポイント
-│   │   └── health.py                # K8s ヘルスチェックエンドポイント
-│   └── services/
-│       ├── __init__.py
-│       └── hello.py                 # ビジネスロジック
-├── docs/
-│   └── architecture.md              # このファイル
-├── tests/
-│   ├── integration/
-│   │   └── test_root_endpoint.py    # HTTP レイヤー統合テスト
-│   └── unit/
-│       ├── test_hello_service.py    # hello サービス単体テスト
-│       └── test_health_service.py   # health サービス単体テスト
-├── main.py                          # エントリーポイント（app.main に委譲）
-├── pyproject.toml                   # プロジェクト設定・依存関係
-├── uv.lock                          # 依存関係ロックファイル
-└── README.md                        # セットアップ・起動手順
-```
+→ 詳細は [project-structure.md](./project-structure.md) を参照。
 
 ## リクエストフロー
 
