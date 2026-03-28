@@ -4,83 +4,57 @@ FastAPI の学習用チュートリアルプロジェクトです。
 
 ## 必要条件
 
-- Python 3.14+
-- [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- [Docker](https://docs.docker.com/get-docker/) + Docker Compose
 
 ## セットアップ
 
 ```bash
-# リポジトリのクローン
 git clone <repository-url>
 cd fastapi-tutorial
-
-# 依存パッケージのインストール（仮想環境も自動作成）
-uv sync
 ```
 
 ## サーバー起動
 
+### 本番モード
+
 ```bash
-uv run uvicorn main:app --reload
+docker compose up -d
 ```
 
-`--reload` オプションにより、コードの変更が自動的に反映されます。
+### 開発モード（ホットリロード）
+
+```bash
+docker compose --profile dev up api-dev
+```
 
 ## 動作確認
 
-サーバー起動後、以下の方法で確認できます。
-
-### curl
-
 ```bash
 curl http://127.0.0.1:8000/
-# => {"message":"Hello World"}
 ```
-
-### ブラウザ
 
 | URL | 内容 |
 |-----|------|
-| http://127.0.0.1:8000/ | Hello World API |
-| http://127.0.0.1:8000/docs | Swagger UI（インタラクティブドキュメント） |
-| http://127.0.0.1:8000/redoc | ReDoc（APIリファレンス） |
+| http://127.0.0.1:8000/ | Hello World + ルート一覧 |
+| http://127.0.0.1:8000/docs | Swagger UI |
+| http://127.0.0.1:8000/redoc | ReDoc |
 
 ## テスト
 
 ```bash
+# ローカル実行（uv が必要）
 uv run pytest -v
 ```
 
 ## パッケージ管理
 
 ```bash
-# パッケージ追加
 uv add <package-name>
-
-# パッケージ削除
 uv remove <package-name>
 ```
 
-## プロジェクト構成
+## ドキュメント
 
-```
-fastapi-tutorial/
-├── .github/
-│   ├── copilot-instructions.md      # Copilot 共通指示
-│   └── instructions/                # パス別レビュー観点
-├── app/
-│   ├── main.py                      # FastAPI アプリ本体・lifespan 定義
-│   ├── routers/
-│   │   ├── root.py                  # GET / エンドポイント
-│   │   └── health.py                # K8s ヘルスチェックエンドポイント
-│   └── services/
-│       └── hello.py                 # ビジネスロジック
-├── docs/                            # アーキテクチャ・設計ドキュメント
-├── tests/
-│   ├── integration/                 # HTTP レイヤー統合テスト
-│   └── unit/                        # 単体テスト
-├── main.py                          # エントリーポイント（app.main に委譲）
-├── pyproject.toml                   # プロジェクト設定・依存関係
-├── uv.lock                          # 依存関係ロックファイル
-└── README.md                        # このファイル
-```
+- [アーキテクチャ・プロジェクト構成](docs/architecture.md)
+- [OpenAPI スキーマ](docs/openapi.yaml)
+
