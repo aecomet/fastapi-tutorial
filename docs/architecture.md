@@ -9,11 +9,13 @@
 | データバリデーション | Pydantic | (FastAPI 依存) |
 | パッケージ管理 | uv | - |
 | 言語 | Python | >=3.14 |
+| Lint / Format | Ruff | >=0.15.8 |
+| テスト | pytest + httpx | >=9.0.2 |
 
 ## コンポーネント構成
 
 ```
-クライアント (ブラウザ / curl)
+クライアント (ブラウザ / curl / K8s probe)
         │
         │ HTTP
         ▼
@@ -28,10 +30,13 @@
 │    (Starlette)    │  ルーティング・バリデーション・シリアライズ
 └────────┬──────────┘
          │
+         ├─── app/routers/root.py      # / エンドポイント
+         ├─── app/routers/health.py    # /health/* エンドポイント
+         │
          ▼
 ┌───────────────────┐
-│    main.py        │  アプリケーションロジック
-│  エンドポイント    │  ビジネスロジック・レスポンス生成
+│  app/services/    │  ビジネスロジック層
+│  hello.py         │  サービス関数（ルーターから呼び出し）
 └───────────────────┘
 ```
 
@@ -39,30 +44,54 @@
 
 ```
 fastapi-tutorial/
+├── .github/
+│   ├── copilot-instructions.md      # Copilot 共通指示
+│   └── instructions/
+│       └── fastapi-review.instructions.md  # レビュー観点
+├── app/
+│   ├── __init__.py
+│   ├── main.py                      # FastAPI アプリ本体・lifespan 定義
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── root.py                  # GET / エンドポイント
+│   │   └── health.py                # K8s ヘルスチェックエンドポイント
+│   └── services/
+│       ├── __init__.py
+│       └── hello.py                 # ビジネスロジック
 ├── docs/
-│   └── architecture.md  # このファイル
-├── main.py              # FastAPI アプリ本体・エンドポイント定義
-├── pyproject.toml       # プロジェクトメタデータ・依存関係
-├── uv.lock              # 再現性確保のためのロックファイル
-└── README.md            # セットアップ・起動手順
+│   └── architecture.md              # このファイル
+├── tests/
+│   ├── integration/
+│   │   └── test_root_endpoint.py    # HTTP レイヤー統合テスト
+│   └── unit/
+│       ├── test_hello_service.py    # hello サービス単体テスト
+│       └── test_health_service.py   # health サービス単体テスト
+├── main.py                          # エントリーポイント（app.main に委譲）
+├── pyproject.toml                   # プロジェクト設定・依存関係
+├── uv.lock                          # 依存関係ロックファイル
+└── README.md                        # セットアップ・起動手順
 ```
 
 ## リクエストフロー
 
+### 通常リクエスト
+
 ```
-GET /  リクエスト
-    │
-    ▼
-Uvicorn がリクエストを受信
-    │
-    ▼
-FastAPI がルートマッチング ( GET "/" )
-    │
-    ▼
-read_root() 関数を呼び出し
-    │
-    ▼
-{"message": "Hello World"} を JSON で返却
+GET /
+  │
+  ▼ Uvicorn 受信
+  ▼ FastAPI ルーティング → root.router
+  ▼ read_root() 呼び出し
+  ▼ build_hello_message() (services/hello.py)
+  ▼ {"message": "Hello World"} を JSON で返却
+```
+
+### K8s ヘルスチェック
+
+```
+GET /health/startup    → lifespan 完了後に 200、未完了時は 503
+GET /health/readiness  → 常時 200（依存サービスが追加されたら要拡張）
+GET /health/liveness   → 常時 200（プロセス生存確認）
 ```
 
 ## エンドポイント一覧
@@ -70,9 +99,35 @@ read_root() 関数を呼び出し
 | メソッド | パス | 説明 |
 |---------|------|------|
 | GET | `/` | Hello World レスポンスを返す |
+| GET | `/health/startup` | K8s startupProbe 用 |
+| GET | `/health/readiness` | K8s readinessProbe 用 |
+| GET | `/health/liveness` | K8s livenessProbe 用 |
 | GET | `/docs` | Swagger UI（自動生成） |
 | GET | `/redoc` | ReDoc（自動生成） |
 | GET | `/openapi.json` | OpenAPI スキーマ（自動生成） |
+
+## K8s Probe 設定例
+
+```yaml
+startupProbe:
+  httpGet:
+    path: /health/startup
+    port: 8000
+  failureThreshold: 30
+  periodSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health/readiness
+    port: 8000
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health/liveness
+    port: 8000
+  periodSeconds: 30
+```
 
 ## 開発サーバーとプロダクション
 

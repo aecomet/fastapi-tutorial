@@ -66,12 +66,21 @@ uv remove <package-name>
 ```
 fastapi-tutorial/
 ├── .github/
-│   ├── copilot-instructions.md  # Copilot 共通指示
-│   └── instructions/            # パス別レビュー観点
-├── docs/                        # アーキテクチャ・設計ドキュメント
-├── tests/                       # テストコード
-├── main.py                      # アプリケーションエントリーポイント
-├── pyproject.toml               # プロジェクト設定・依存関係
-├── uv.lock                      # 依存関係ロックファイル
-└── README.md                    # このファイル
+│   ├── copilot-instructions.md      # Copilot 共通指示
+│   └── instructions/                # パス別レビュー観点
+├── app/
+│   ├── main.py                      # FastAPI アプリ本体・lifespan 定義
+│   ├── routers/
+│   │   ├── root.py                  # GET / エンドポイント
+│   │   └── health.py                # K8s ヘルスチェックエンドポイント
+│   └── services/
+│       └── hello.py                 # ビジネスロジック
+├── docs/                            # アーキテクチャ・設計ドキュメント
+├── tests/
+│   ├── integration/                 # HTTP レイヤー統合テスト
+│   └── unit/                        # 単体テスト
+├── main.py                          # エントリーポイント（app.main に委譲）
+├── pyproject.toml                   # プロジェクト設定・依存関係
+├── uv.lock                          # 依存関係ロックファイル
+└── README.md                        # このファイル
 ```
