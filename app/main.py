@@ -9,8 +9,9 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.middleware import RequestLoggingMiddleware
-from app.presentation.routers import authors, books, health, root
-from app.presentation.routers.health import set_startup_complete
+from app.presentation.routers.v1 import health, root
+from app.presentation.routers.v1.health import set_startup_complete
+from app.presentation.routers.v2 import authors, books
 
 # APP_ENV に応じたログ設定を適用（uvicorn のログ設定より後に実行されるため上書き可能）
 _settings = get_settings()
