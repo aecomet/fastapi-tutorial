@@ -6,134 +6,204 @@
 |------|--------|-----------|
 | Web フレームワーク | FastAPI | >=0.135.2 |
 | ASGI サーバー | Uvicorn | >=0.42.0 |
-| データバリデーション | Pydantic | (FastAPI 依存) |
+| データバリデーション・設定管理 | Pydantic / pydantic-settings | (FastAPI 依存 / >=2.13.1) |
+| ORM | SQLAlchemy | >=2.0.48 |
+| DB ドライバー | PyMySQL | >=1.1.2 |
+| KV ストア・Pub/Sub | Redis | >=7.4.0 |
 | コンテナ | Docker + Docker Compose | - |
 | パッケージ管理 | uv | - |
 | 言語 | Python | >=3.14 |
 | Lint / Format | Ruff | >=0.15.8 |
-| テスト | pytest + httpx | >=9.0.2 |
+| テスト | pytest / pytest-asyncio / fakeredis | >=9.0.2 |
 
-## コンポーネント構成
+## アーキテクチャ概要
+
+**Clean Architecture** を採用。依存関係は外側から内側への一方向のみ許可する。
 
 ```
-クライアント (ブラウザ / curl / K8s probe)
-        │
-        │ HTTP
-        ▼
-┌───────────────────┐
-│    Docker         │  コンテナランタイム
-│  (ポート 8000)    │  ホスト ↔ コンテナのポートマッピング
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│    Uvicorn        │  ASGI サーバー
-│                   │  リクエストの受付・プロセス管理
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│    FastAPI        │  Web フレームワーク
-│    (Starlette)    │  ルーティング・バリデーション・シリアライズ
-└────────┬──────────┘
-         │
-         ├─── app/routers/root.py      # / エンドポイント
-         ├─── app/routers/health.py    # /health/* エンドポイント
-         │
-         ▼
-┌───────────────────┐
-│  app/services/    │  ビジネスロジック層
-│                   │  サービス関数（ルーターから呼び出し）
-└───────────────────┘
+presentation ──→ application ──→ domain ←── infrastructure
 ```
+
+| レイヤー | パス | 責務 | 外部依存 |
+|---------|------|------|---------|
+| **Domain** | `app/domain/` | エンティティ・リポジトリ抽象・例外定義 | なし（純粋 Python） |
+| **Application** | `app/application/` | ユースケース（ビジネスロジック） | Domain のみ |
+| **Infrastructure** | `app/infrastructure/` | DB・Redis の具体実装 | SQLAlchemy・redis-py |
+| **Presentation** | `app/presentation/` | FastAPI ルーター・スキーマ | Application・Infrastructure |
 
 ## ディレクトリ構成
 
 ```
 fastapi-tutorial/
 ├── .github/
-│   ├── copilot-instructions.md      # Copilot 共通指示（diff確認・Conventional Commits 等）
+│   ├── copilot-instructions.md          # Copilot 共通指示
 │   └── instructions/
-│       └── fastapi-review.instructions.md  # *.py へのレビュー観点
+│       └── fastapi-review.instructions.md
 │
-├── app/                             # アプリケーション本体
-│   ├── __init__.py
-│   ├── main.py                      # FastAPI インスタンス生成・lifespan・ルーター登録
-│   ├── routers/
-│   │   ├── __init__.py
-│   │   ├── root.py                  # GET /
-│   │   └── health.py                # GET /health/{startup,readiness,liveness}
-│   └── services/
-│       ├── __init__.py
-│       ├── root.py                  # RootResponse モデル・ルート一覧
-│       └── hello.py                 # ビジネスロジック
-│
-├── docs/
-│   ├── architecture.md              # このファイル（アーキテクチャ・構成の統合ドキュメント）
-│   └── openapi.yaml                 # OpenAPI 3.1.0 スキーマ
+├── app/
+│   ├── main.py                          # FastAPI インスタンス・lifespan・ルーター登録・ログ設定
+│   ├── middleware.py                    # ASGI リクエストログ（例外スタックトレース含む）
+│   ├── logging_config.py               # RFC 7159 準拠 JsonFormatter
+│   │
+│   ├── config/                          # 環境別設定（pydantic-settings）
+│   │   ├── base.py                      # 共通 Settings（database_url / redis_url / log_level）
+│   │   ├── local.py                     # ローカル設定
+│   │   ├── production.py               # 本番設定
+│   │   ├── log_config.local.json       # ローカル用ログ設定
+│   │   └── log_config.production.json  # 本番用ログ設定
+│   │
+│   ├── domain/                          # ドメイン層（外部依存なし）
+│   │   ├── entities/
+│   │   │   ├── author.py               # Author dataclass
+│   │   │   ├── book.py                 # Book dataclass
+│   │   │   └── dpar.py                 # Dpar dataclass
+│   │   ├── repositories/
+│   │   │   ├── author.py               # IAuthorRepository (ABC)
+│   │   │   ├── book.py                 # IBookRepository (ABC)
+│   │   │   └── dpar.py                 # IDparRepository (ABC)
+│   │   └── exceptions.py               # NotFoundError
+│   │
+│   ├── application/                     # アプリケーション層
+│   │   └── use_cases/
+│   │       ├── author.py               # AuthorUseCase
+│   │       ├── book.py                 # BookUseCase
+│   │       └── dpar.py                 # DparUseCase
+│   │
+│   ├── infrastructure/                  # インフラ層
+│   │   ├── database.py                 # SQLAlchemy engine / SessionLocal / get_db()
+│   │   ├── redis.py                    # Redis クライアント get_redis()
+│   │   ├── models/
+│   │   │   ├── author.py               # AuthorModel (ORM)
+│   │   │   └── book.py                 # BookModel (ORM)
+│   │   └── repositories/
+│   │       ├── author.py               # SqlAlchemyAuthorRepository
+│   │       ├── book.py                 # SqlAlchemyBookRepository
+│   │       └── dpar.py                 # RedisDparRepository
+│   │
+│   └── presentation/                   # プレゼンテーション層
+│       ├── schemas/
+│       │   ├── author.py               # Pydantic スキーマ
+│       │   ├── book.py
+│       │   ├── dpar.py
+│       │   └── root.py                 # RootResponse / ルート一覧
+│       └── routers/
+│           ├── v1/
+│           │   ├── health.py           # GET /api/v1/health/*
+│           │   └── root.py             # GET /api/v1/
+│           ├── v2/
+│           │   ├── authors.py          # CRUD /api/v2/authors
+│           │   └── books.py            # CRUD /api/v2/books
+│           └── v3/
+│               └── dpar.py             # KV /api/v3/dpar
 │
 ├── tests/
 │   ├── integration/
-│   │   └── test_root_endpoint.py    # HTTP レイヤー統合テスト
+│   │   ├── test_root_endpoint.py       # v1 エンドポイント統合テスト
+│   │   └── test_v2_crud.py             # v2 CRUD 統合テスト
 │   └── unit/
-│       ├── test_hello_service.py    # root サービス単体テスト
-│       └── test_health_service.py   # health サービス単体テスト
+│       ├── test_health_service.py
+│       └── test_hello_service.py
 │
-├── Dockerfile                       # マルチステージビルド（builder / runtime）
-├── docker-compose.yml               # prod（デフォルト）/ dev プロファイル
-├── .dockerignore
-├── main.py                          # エントリーポイント（app.main:app に委譲）
-├── pyproject.toml                   # プロジェクト設定・依存関係・ruff/pytest 設定
-├── uv.lock                          # 依存関係ロックファイル
-└── README.md                        # セットアップ・起動手順
+├── docs/
+│   └── architecture.md                 # このファイル
+│                                        # ※ OpenAPI スキーマは /openapi.json で自動生成
+│
+├── Dockerfile
+├── docker-compose.yml                  # api / mysql / redis サービス
+├── main.py                             # エントリーポイント
+├── pyproject.toml
+└── README.md
 ```
 
-## 各レイヤーの責務
-
-| レイヤー | パス | 責務 |
-|---------|------|------|
-| エントリーポイント | `main.py` | uvicorn 向けの `app` オブジェクト公開 |
-| アプリ初期化 | `app/main.py` | FastAPI インスタンス・lifespan・ルーター登録 |
-| ルーター | `app/routers/` | HTTP メソッド・パスの定義、レスポンス型の指定 |
-| サービス | `app/services/` | ビジネスロジック（ルーターから呼び出す） |
-| テスト | `tests/` | unit（サービス単体）/ integration（HTTP レイヤー） |
-| ドキュメント | `docs/` | アーキテクチャ・API スキーマ |
-| Copilot 設定 | `.github/` | instructions・レビュー観点 |
-
-## リクエストフロー
-
-### 通常リクエスト
+## インフラ構成（Docker Compose）
 
 ```
-GET /api/v1/
-  │
-  ▼ Docker ポートマッピング (8000 → 8000)
-  ▼ Uvicorn 受信
-  ▼ FastAPI ルーティング → root.router
-  ▼ read_root() 呼び出し
-  ▼ build_root_response() (services/root.py)
-  ▼ {"message": "Hello World", "routes": [...]} を JSON で返却
-```
-
-### K8s ヘルスチェック
-
-```
-GET /api/v1/health/startup    → lifespan 完了後に 200、未完了時は 503
-GET /api/v1/health/readiness  → 常時 200（依存サービスが追加されたら要拡張）
-GET /api/v1/health/liveness   → 常時 200（プロセス生存確認）
+クライアント
+    │ HTTP :8000
+    ▼
+┌─────────────────────────────────────────────┐
+│  api (FastAPI + Uvicorn)                    │
+│  RequestLoggingMiddleware                   │
+│    ├── /api/v1/*  → presentation/routers/v1 │
+│    ├── /api/v2/*  → presentation/routers/v2 │
+│    └── /api/v3/*  → presentation/routers/v3 │
+└──────────┬──────────────────┬───────────────┘
+           │ MySQL :3306       │ Redis :6379
+           ▼                  ▼
+     ┌──────────┐       ┌──────────┐
+     │  MySQL   │       │  Redis   │
+     │  8.0     │       │  7       │
+     └──────────┘       └──────────┘
 ```
 
 ## エンドポイント一覧
 
+### v1 — システム
+
 | メソッド | パス | 説明 |
 |---------|------|------|
 | GET | `/api/v1/` | Hello World + ルート一覧 |
-| GET | `/api/v1/health/startup` | K8s startupProbe 用 |
-| GET | `/api/v1/health/readiness` | K8s readinessProbe 用 |
-| GET | `/api/v1/health/liveness` | K8s livenessProbe 用 |
-| GET | `/docs` | Swagger UI（自動生成） |
-| GET | `/redoc` | ReDoc（自動生成） |
-| GET | `/openapi.json` | OpenAPI スキーマ（自動生成） |
+| GET | `/api/v1/health/startup` | K8s startupProbe（DB・Redis 疎通チェック含む） |
+| GET | `/api/v1/health/readiness` | K8s readinessProbe |
+| GET | `/api/v1/health/liveness` | K8s livenessProbe |
+
+### v2 — Author / Book CRUD（MySQL）
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| GET | `/api/v2/authors/` | 著者一覧 |
+| POST | `/api/v2/authors/` | 著者登録 |
+| GET | `/api/v2/authors/{id}` | 著者取得 |
+| PUT | `/api/v2/authors/{id}` | 著者更新 |
+| DELETE | `/api/v2/authors/{id}` | 著者削除 |
+| GET | `/api/v2/books/` | 書籍一覧（author_id フィルタ対応） |
+| POST | `/api/v2/books/` | 書籍登録 |
+| GET | `/api/v2/books/{id}` | 書籍取得 |
+| PUT | `/api/v2/books/{id}` | 書籍更新 |
+| DELETE | `/api/v2/books/{id}` | 書籍削除 |
+
+### v3 — Dpar KV ストア（Redis）
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| GET | `/api/v3/dpar/` | キー一覧（pattern クエリ対応） |
+| GET | `/api/v3/dpar/{key}` | 値取得 |
+| PUT | `/api/v3/dpar/{key}` | 値設定（TTL オプション） |
+| DELETE | `/api/v3/dpar/{key}` | 値削除 |
+
+### API ドキュメント（自動生成）
+
+| パス | 説明 |
+|------|------|
+| `/docs` | Swagger UI |
+| `/redoc` | ReDoc |
+| `/openapi.json` | OpenAPI スキーマ（JSON） |
+
+> `docs/openapi.yaml` は管理しない。FastAPI が `/openapi.json` を常に最新状態で自動生成するため。
+
+## リクエストフロー（v2 例）
+
+```
+POST /api/v2/authors/
+  │
+  ▼ RequestLoggingMiddleware（リクエストボディをログ出力）
+  ▼ FastAPI ルーティング → presentation/routers/v2/authors.py
+  ▼ get_author_use_case() DI
+  ▼ AuthorUseCase.create_author()
+  ▼ SqlAlchemyAuthorRepository.create()
+  ▼ MySQL INSERT
+  ▼ Author エンティティ → AuthorResponse スキーマ → JSON レスポンス
+  ▼ RequestLoggingMiddleware（レスポンスステータスをログ出力）
+```
+
+## 環境設定
+
+| 環境変数 | デフォルト | 説明 |
+|---------|-----------|------|
+| `APP_ENV` | `local` | 設定プロファイル（local / production） |
+| `DATABASE_URL` | `sqlite:///./fastapi_dev.db` | MySQL 接続文字列 |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis 接続文字列 |
+| `LOG_LEVEL` | `INFO` | ログレベル |
 
 ## K8s Probe 設定例
 
@@ -158,38 +228,5 @@ livenessProbe:
   periodSeconds: 30
 ```
 
-## 起動方法
-
-| 環境 | コマンド |
-|------|---------|
-| Docker | `docker compose up` |
-| ローカル | `uv run uvicorn main:app --reload` |
 
 
-## コンポーネント構成
-
-```
-クライアント (ブラウザ / curl / K8s probe)
-        │
-        │ HTTP
-        ▼
-┌───────────────────┐
-│    Uvicorn        │  ASGI サーバー
-│  (ポート 8000)    │  リクエストの受付・プロセス管理
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│    FastAPI        │  Web フレームワーク
-│    (Starlette)    │  ルーティング・バリデーション・シリアライズ
-└────────┬──────────┘
-         │
-         ├─── app/routers/root.py      # / エンドポイント
-         ├─── app/routers/health.py    # /health/* エンドポイント
-         │
-         ▼
-┌───────────────────┐
-│  app/services/    │  ビジネスロジック層
-│  hello.py         │  サービス関数（ルーターから呼び出し）
-└───────────────────┘
-```
