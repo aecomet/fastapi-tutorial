@@ -1,7 +1,13 @@
 from enum import StrEnum
 
-from fastapi import APIRouter
+import redis as redis_lib
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import text
+
+from app.infrastructure.database import get_db
+from app.infrastructure.redis import get_redis
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -22,21 +28,59 @@ class HealthStatus(StrEnum):
 class HealthResponse(BaseModel):
     status: HealthStatus
     detail: str
+    checks: dict[str, HealthStatus] | None = None
+
+
+def _check_database(db: Session) -> HealthStatus:
+    try:
+        db.execute(text("SELECT 1"))
+        return HealthStatus.ok
+    except Exception:
+        return HealthStatus.degraded
+
+
+def _check_redis(client: redis_lib.Redis) -> HealthStatus:
+    try:
+        client.ping()
+        return HealthStatus.ok
+    except Exception:
+        return HealthStatus.degraded
 
 
 @router.get(
     "/startup",
     response_model=HealthResponse,
     summary="Startup probe",
-    description="アプリケーションの起動完了を確認する。起動完了前は 503 を返す。",
+    description="アプリケーションの起動完了と各ミドルウェアの疎通を確認する。",
 )
-def startup_probe() -> HealthResponse:
-    """K8s startupProbe 用エンドポイント。"""
+def startup_probe(
+    db: Session = Depends(get_db),
+    redis_client: redis_lib.Redis = Depends(get_redis),
+) -> HealthResponse:
+    """K8s startupProbe 用エンドポイント。DB・Redis の疎通チェックを含む。"""
     if not _startup_complete:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=503, detail="Application is still starting up")
-    return HealthResponse(status=HealthStatus.ok, detail="Application startup complete")
+
+    checks = {
+        "database": _check_database(db),
+        "redis": _check_redis(redis_client),
+    }
+    all_ok = all(v == HealthStatus.ok for v in checks.values())
+    overall = HealthStatus.ok if all_ok else HealthStatus.degraded
+    if overall != HealthStatus.ok:
+        raise HTTPException(
+            status_code=503,
+            detail=HealthResponse(
+                status=overall,
+                detail="One or more middleware checks failed",
+                checks=checks,
+            ).model_dump(),
+        )
+    return HealthResponse(
+        status=HealthStatus.ok,
+        detail="Application startup complete",
+        checks=checks,
+    )
 
 
 @router.get(
