@@ -1,8 +1,11 @@
 import logging
+import traceback
 
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger("app.access")
+error_logger = logging.getLogger("app.error")
 
 
 class RequestLoggingMiddleware:
@@ -10,6 +13,7 @@ class RequestLoggingMiddleware:
 
     BaseHTTPMiddleware はボディを読み取るとストリームを消費してしまうため、
     receive / send を直接ラップする方式で実装している。
+    例外発生時はスタックトレースを含めてエラーログを出力し、500 を返す。
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -58,4 +62,23 @@ class RequestLoggingMiddleware:
                 )
             await send(message)
 
-        await self.app(scope, buffered_receive, logging_send)
+        try:
+            await self.app(scope, buffered_receive, logging_send)
+        except Exception as exc:
+            error_logger.error(
+                "unhandled exception",
+                exc_info=True,
+                extra={
+                    "http.method": method,
+                    "http.path": path,
+                    "http.query": query or None,
+                    "error.type": type(exc).__name__,
+                    "error.message": str(exc),
+                    "error.stacktrace": traceback.format_exc(),
+                },
+            )
+            response = JSONResponse(
+                status_code=500,
+                content={"detail": "Internal Server Error"},
+            )
+            await response(scope, receive, send)
