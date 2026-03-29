@@ -94,14 +94,19 @@ fastapi-tutorial/
 │           │   ├── authors.py          # CRUD /api/v2/authors
 │           │   └── books.py            # CRUD /api/v2/books
 │           └── v3/
-│               └── dpar.py             # Pub/Sub /api/v3/dpar
+│               └── dpar.py             # Pub/Sub /api/v3/dpar（publish のみ）
+│
+├── workers/                             # 非同期バックグラウンドワーカー
+│   ├── base.py                         # BaseWorker（ABC）
+│   └── dpar.py                         # EventWorker（Redis Subscribe → ログ出力）
 │
 ├── tests/
 │   ├── integration/
 │   │   ├── test_root_endpoint.py       # v1 エンドポイント統合テスト
 │   │   ├── test_v2_crud.py             # v2 CRUD 統合テスト
-│   │   └── test_v3_dpar.py             # v3 dpar Pub/Sub 統合テスト
+│   │   └── test_v3_dpar.py             # v3 dpar Publish 統合テスト
 │   └── unit/
+│       ├── test_event_worker.py        # EventWorker 単体テスト
 │       ├── test_health_service.py
 │       └── test_hello_service.py
 │
@@ -128,6 +133,9 @@ fastapi-tutorial/
 │    ├── /api/v1/*  → presentation/routers/v1 │
 │    ├── /api/v2/*  → presentation/routers/v2 │
 │    └── /api/v3/*  → presentation/routers/v3 │
+│                                             │
+│  EventWorker (asyncio.Task)                 │
+│    └── Redis SUBSCRIBE → ログ出力           │
 └──────────┬──────────────────┬───────────────┘
            │ MySQL :3306       │ Redis :6379
            ▼                  ▼
@@ -168,10 +176,10 @@ fastapi-tutorial/
 | メソッド | パス | 説明 |
 |---------|------|------|
 | POST | `/api/v3/dpar/{channel}/publish` | チャンネルにイベントを Publish |
-| GET | `/api/v3/dpar/{channel}/subscribe` | チャンネルを Subscribe（SSE ストリーミング） |
 
-> **設計思想（dpar）**: `IEventBus` ABC がバックエンドを抽象化するため、Redis Pub/Sub を他のブローカー（Kafka・RabbitMQ 等）に差し替えても Presentation / Application 層を変更不要。  
-> SSE（Server-Sent Events）を使い、クライアントはチャンネルを購読してリアルタイムにイベントを受信できる。
+> **Subscribe はエンドポイントではなくバックグラウンドワーカーで処理する。**  
+> `EventWorker` が `DPAR_WORKER_CHANNEL`（デフォルト: `events`）を Subscribe し、  
+> 受信イベントをログ出力する。追加チャンネルを購読したい場合は `lifespan` にワーカーを追加する。
 
 
 ### API ドキュメント（自動生成）
@@ -210,11 +218,10 @@ POST /api/v3/dpar/{channel}/publish
   ▼ RedisEventBus.publish() → Redis PUBLISH
   ▼ EventResponse（channel / payload / event_id / timestamp）→ JSON
 
-GET /api/v3/dpar/{channel}/subscribe  ← SSE（long-lived connection）
-  │
-  ▼ RedisEventBus.subscribe() → Redis SUBSCRIBE
-  ▼ 非同期ループで message を受信
-  ▼ StreamingResponse（text/event-stream）でクライアントにプッシュ
+EventWorker（asyncio.Task、lifespan で起動）
+  ▼ RedisEventBus.subscribe(channel) → Redis SUBSCRIBE
+  ▼ 非同期ループでメッセージを受信
+  ▼ logger.info("Event consumed", extra={channel, event_id, payload, timestamp})
 ```
 
 ## 環境設定
@@ -225,6 +232,7 @@ GET /api/v3/dpar/{channel}/subscribe  ← SSE（long-lived connection）
 | `DATABASE_URL` | `sqlite:///./fastapi_dev.db` | MySQL 接続文字列 |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis 接続文字列 |
 | `LOG_LEVEL` | `INFO` | ログレベル |
+| `DPAR_WORKER_CHANNEL` | `events` | EventWorker が Subscribe するチャンネル名 |
 
 ## K8s Probe 設定例
 

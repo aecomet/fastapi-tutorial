@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import logging.config
@@ -5,6 +6,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import redis.asyncio as aioredis
 from fastapi import FastAPI
 
 from app.config import get_settings
@@ -29,10 +31,20 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     import app.infrastructure.models  # noqa: F401 — Base.metadata にモデルを登録
     from app.infrastructure.database import Base, engine
+    from app.workers.dpar import EventWorker
 
     Base.metadata.create_all(bind=engine)
     set_startup_complete()
+
+    redis_client = aioredis.Redis.from_url(_settings.redis_url, decode_responses=True)
+    worker = EventWorker(channel=_settings.dpar_worker_channel, redis_client=redis_client)
+    task = asyncio.create_task(worker.run())
+
     yield
+
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    await redis_client.aclose()
 
 
 app = FastAPI(lifespan=lifespan)

@@ -1,6 +1,5 @@
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
 
 from app.application.use_cases.dpar import EventUseCase
 from app.infrastructure.redis import get_async_redis
@@ -32,25 +31,3 @@ async def publish_event(
         event_id=event.event_id,
         timestamp=event.timestamp,
     )
-
-
-@router.get(
-    "/{channel}/subscribe",
-    summary="イベント購読（SSE）",
-    description="指定チャンネルを Subscribe し、SSE でイベントをストリーミングする。",
-)
-async def subscribe_events(
-    channel: str,
-    use_case: EventUseCase = Depends(get_event_use_case),
-) -> StreamingResponse:
-    async def event_stream():
-        async for event in use_case.subscribe(channel):
-            data = EventResponse(
-                channel=event.channel,
-                payload=event.payload,
-                event_id=event.event_id,
-                timestamp=event.timestamp,
-            )
-            yield f"data: {data.model_dump_json()}\n\n"
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")

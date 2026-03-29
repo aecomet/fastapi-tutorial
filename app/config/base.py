@@ -12,3 +12,4 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./fastapi_dev.db"
     redis_url: str = "redis://localhost:6379/0"
     log_level: str = "INFO"
+    dpar_worker_channel: str = "events"
