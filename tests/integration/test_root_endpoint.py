@@ -1,4 +1,5 @@
 import fakeredis
+import fakeredis.aioredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -7,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 import app.infrastructure.models  # noqa: F401
 from app.infrastructure.database import Base, get_db
-from app.infrastructure.redis import get_redis
+from app.infrastructure.redis import get_async_redis, get_redis
 from app.main import app
 
 TEST_DATABASE_URL = "sqlite://"
@@ -36,11 +37,20 @@ def override_get_redis():
         client.close()
 
 
+async def override_get_async_redis():
+    client = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    try:
+        yield client
+    finally:
+        await client.aclose()
+
+
 @pytest.fixture
 def client():
     Base.metadata.create_all(bind=test_engine)
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_redis] = override_get_redis
+    app.dependency_overrides[get_async_redis] = override_get_async_redis
     with TestClient(app) as c:
         yield c
     Base.metadata.drop_all(bind=test_engine)

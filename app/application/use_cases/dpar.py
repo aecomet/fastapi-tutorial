@@ -1,24 +1,15 @@
-from app.domain.entities.dpar import Dpar
-from app.domain.exceptions import NotFoundError
-from app.domain.repositories.dpar import IDparRepository
+from collections.abc import AsyncIterator
+
+from app.domain.entities.dpar import Event
+from app.domain.repositories.dpar import IEventBus
 
 
-class DparUseCase:
-    def __init__(self, repo: IDparRepository) -> None:
-        self._repo = repo
+class EventUseCase:
+    def __init__(self, bus: IEventBus) -> None:
+        self._bus = bus
 
-    def get(self, key: str) -> Dpar:
-        dpar = self._repo.get(key)
-        if dpar is None:
-            raise NotFoundError(f"key '{key}' not found")
-        return dpar
+    async def publish(self, channel: str, payload: dict) -> Event:
+        return await self._bus.publish(channel, payload)
 
-    def set(self, key: str, value: str, ttl: int | None = None) -> Dpar:
-        return self._repo.set(key, value, ttl=ttl)
-
-    def delete(self, key: str) -> None:
-        if not self._repo.delete(key):
-            raise NotFoundError(f"key '{key}' not found")
-
-    def keys(self, pattern: str = "*") -> list[str]:
-        return self._repo.keys(pattern)
+    def subscribe(self, channel: str) -> AsyncIterator[Event]:
+        return self._bus.subscribe(channel)

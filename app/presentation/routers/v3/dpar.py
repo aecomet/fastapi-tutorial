@@ -1,50 +1,56 @@
-import redis
-from fastapi import APIRouter, Depends, HTTPException, status
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 
-from app.application.use_cases.dpar import DparUseCase
-from app.domain.exceptions import NotFoundError
-from app.infrastructure.redis import get_redis
-from app.infrastructure.repositories.dpar import RedisDparRepository
-from app.presentation.schemas.dpar import DparKeysResponse, DparResponse, DparSet
+from app.application.use_cases.dpar import EventUseCase
+from app.infrastructure.redis import get_async_redis
+from app.infrastructure.repositories.dpar import RedisEventBus
+from app.presentation.schemas.dpar import EventPublish, EventResponse
 
 router = APIRouter(prefix="/dpar", tags=["dpar"])
 
 
-def get_dpar_use_case(client: redis.Redis = Depends(get_redis)) -> DparUseCase:
-    return DparUseCase(repo=RedisDparRepository(client))
+def get_event_use_case(client: aioredis.Redis = Depends(get_async_redis)) -> EventUseCase:
+    return EventUseCase(bus=RedisEventBus(client))
 
 
-@router.get("/", response_model=DparKeysResponse, summary="キー一覧取得")
-def list_keys(
-    pattern: str = "*",
-    use_case: DparUseCase = Depends(get_dpar_use_case),
-) -> DparKeysResponse:
-    keys = use_case.keys(pattern)
-    return DparKeysResponse(keys=keys, count=len(keys))
+@router.post(
+    "/{channel}/publish",
+    response_model=EventResponse,
+    summary="イベント発行",
+    description="指定チャンネルにイベントを Publish する。",
+)
+async def publish_event(
+    channel: str,
+    data: EventPublish,
+    use_case: EventUseCase = Depends(get_event_use_case),
+) -> EventResponse:
+    event = await use_case.publish(channel, data.payload)
+    return EventResponse(
+        channel=event.channel,
+        payload=event.payload,
+        event_id=event.event_id,
+        timestamp=event.timestamp,
+    )
 
 
-@router.get("/{key}", response_model=DparResponse, summary="値取得")
-def get_dpar(key: str, use_case: DparUseCase = Depends(get_dpar_use_case)) -> DparResponse:
-    try:
-        dpar = use_case.get(key)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message) from e
-    return DparResponse(key=dpar.key, value=dpar.value, ttl=dpar.ttl)
+@router.get(
+    "/{channel}/subscribe",
+    summary="イベント購読（SSE）",
+    description="指定チャンネルを Subscribe し、SSE でイベントをストリーミングする。",
+)
+async def subscribe_events(
+    channel: str,
+    use_case: EventUseCase = Depends(get_event_use_case),
+) -> StreamingResponse:
+    async def event_stream():
+        async for event in use_case.subscribe(channel):
+            data = EventResponse(
+                channel=event.channel,
+                payload=event.payload,
+                event_id=event.event_id,
+                timestamp=event.timestamp,
+            )
+            yield f"data: {data.model_dump_json()}\n\n"
 
-
-@router.put("/{key}", response_model=DparResponse, summary="値設定")
-def set_dpar(
-    key: str,
-    data: DparSet,
-    use_case: DparUseCase = Depends(get_dpar_use_case),
-) -> DparResponse:
-    dpar = use_case.set(key, data.value, ttl=data.ttl)
-    return DparResponse(key=dpar.key, value=dpar.value, ttl=dpar.ttl)
-
-
-@router.delete("/{key}", status_code=status.HTTP_204_NO_CONTENT, summary="値削除")
-def delete_dpar(key: str, use_case: DparUseCase = Depends(get_dpar_use_case)) -> None:
-    try:
-        use_case.delete(key)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message) from e
+    return StreamingResponse(event_stream(), media_type="text/event-stream")

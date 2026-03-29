@@ -56,29 +56,29 @@ fastapi-tutorial/
 │   │   ├── entities/
 │   │   │   ├── author.py               # Author dataclass
 │   │   │   ├── book.py                 # Book dataclass
-│   │   │   └── dpar.py                 # Dpar dataclass
+│   │   │   └── dpar.py                 # Event dataclass
 │   │   ├── repositories/
 │   │   │   ├── author.py               # IAuthorRepository (ABC)
 │   │   │   ├── book.py                 # IBookRepository (ABC)
-│   │   │   └── dpar.py                 # IDparRepository (ABC)
+│   │   │   └── dpar.py                 # IEventBus (ABC)
 │   │   └── exceptions.py               # NotFoundError
 │   │
 │   ├── application/                     # アプリケーション層
 │   │   └── use_cases/
 │   │       ├── author.py               # AuthorUseCase
 │   │       ├── book.py                 # BookUseCase
-│   │       └── dpar.py                 # DparUseCase
+│   │       └── dpar.py                 # EventUseCase
 │   │
 │   ├── infrastructure/                  # インフラ層
 │   │   ├── database.py                 # SQLAlchemy engine / SessionLocal / get_db()
-│   │   ├── redis.py                    # Redis クライアント get_redis()
+│   │   ├── redis.py                    # get_redis()（同期/health用）・get_async_redis()（Pub/Sub用）
 │   │   ├── models/
 │   │   │   ├── author.py               # AuthorModel (ORM)
 │   │   │   └── book.py                 # BookModel (ORM)
 │   │   └── repositories/
 │   │       ├── author.py               # SqlAlchemyAuthorRepository
 │   │       ├── book.py                 # SqlAlchemyBookRepository
-│   │       └── dpar.py                 # RedisDparRepository
+│   │       └── dpar.py                 # RedisEventBus（redis.asyncio）
 │   │
 │   └── presentation/                   # プレゼンテーション層
 │       ├── schemas/
@@ -94,12 +94,13 @@ fastapi-tutorial/
 │           │   ├── authors.py          # CRUD /api/v2/authors
 │           │   └── books.py            # CRUD /api/v2/books
 │           └── v3/
-│               └── dpar.py             # KV /api/v3/dpar
+│               └── dpar.py             # Pub/Sub /api/v3/dpar
 │
 ├── tests/
 │   ├── integration/
 │   │   ├── test_root_endpoint.py       # v1 エンドポイント統合テスト
-│   │   └── test_v2_crud.py             # v2 CRUD 統合テスト
+│   │   ├── test_v2_crud.py             # v2 CRUD 統合テスト
+│   │   └── test_v3_dpar.py             # v3 dpar Pub/Sub 統合テスト
 │   └── unit/
 │       ├── test_health_service.py
 │       └── test_hello_service.py
@@ -132,7 +133,7 @@ fastapi-tutorial/
            ▼                  ▼
      ┌──────────┐       ┌──────────┐
      │  MySQL   │       │  Redis   │
-     │  8.0     │       │  7       │
+     │  8.4     │       │  7       │
      └──────────┘       └──────────┘
 ```
 
@@ -162,14 +163,16 @@ fastapi-tutorial/
 | PUT | `/api/v2/books/{id}` | 書籍更新 |
 | DELETE | `/api/v2/books/{id}` | 書籍削除 |
 
-### v3 — Dpar KV ストア（Redis）
+### v3 — Dpar イベントバス（Redis Pub/Sub）
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| GET | `/api/v3/dpar/` | キー一覧（pattern クエリ対応） |
-| GET | `/api/v3/dpar/{key}` | 値取得 |
-| PUT | `/api/v3/dpar/{key}` | 値設定（TTL オプション） |
-| DELETE | `/api/v3/dpar/{key}` | 値削除 |
+| POST | `/api/v3/dpar/{channel}/publish` | チャンネルにイベントを Publish |
+| GET | `/api/v3/dpar/{channel}/subscribe` | チャンネルを Subscribe（SSE ストリーミング） |
+
+> **設計思想（dpar）**: `IEventBus` ABC がバックエンドを抽象化するため、Redis Pub/Sub を他のブローカー（Kafka・RabbitMQ 等）に差し替えても Presentation / Application 層を変更不要。  
+> SSE（Server-Sent Events）を使い、クライアントはチャンネルを購読してリアルタイムにイベントを受信できる。
+
 
 ### API ドキュメント（自動生成）
 
@@ -194,6 +197,24 @@ POST /api/v2/authors/
   ▼ MySQL INSERT
   ▼ Author エンティティ → AuthorResponse スキーマ → JSON レスポンス
   ▼ RequestLoggingMiddleware（レスポンスステータスをログ出力）
+```
+
+## リクエストフロー（v3 dpar 例）
+
+```
+POST /api/v3/dpar/{channel}/publish
+  │
+  ▼ FastAPI ルーティング → presentation/routers/v3/dpar.py
+  ▼ get_event_use_case() DI（get_async_redis → RedisEventBus）
+  ▼ EventUseCase.publish(channel, payload)
+  ▼ RedisEventBus.publish() → Redis PUBLISH
+  ▼ EventResponse（channel / payload / event_id / timestamp）→ JSON
+
+GET /api/v3/dpar/{channel}/subscribe  ← SSE（long-lived connection）
+  │
+  ▼ RedisEventBus.subscribe() → Redis SUBSCRIBE
+  ▼ 非同期ループで message を受信
+  ▼ StreamingResponse（text/event-stream）でクライアントにプッシュ
 ```
 
 ## 環境設定

@@ -1,8 +1,11 @@
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 
 @dataclass
-class Dpar:
-    key: str
-    value: str
-    ttl: int | None  # 残り TTL（秒）。None は無期限
+class Event:
+    channel: str
+    payload: dict
+    event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))

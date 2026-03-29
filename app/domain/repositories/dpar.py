@@ -1,17 +1,12 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 
-from app.domain.entities.dpar import Dpar
+from app.domain.entities.dpar import Event
 
 
-class IDparRepository(ABC):
+class IEventBus(ABC):
     @abstractmethod
-    def get(self, key: str) -> Dpar | None: ...
-
-    @abstractmethod
-    def set(self, key: str, value: str, ttl: int | None = None) -> Dpar: ...
+    async def publish(self, channel: str, payload: dict) -> Event: ...
 
     @abstractmethod
-    def delete(self, key: str) -> bool: ...
-
-    @abstractmethod
-    def keys(self, pattern: str = "*") -> list[str]: ...
+    def subscribe(self, channel: str) -> AsyncIterator[Event]: ...

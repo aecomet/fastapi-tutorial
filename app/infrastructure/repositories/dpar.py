@@ -1,29 +1,42 @@
-import redis
+import json
+from collections.abc import AsyncIterator
+from datetime import datetime
 
-from app.domain.entities.dpar import Dpar
-from app.domain.repositories.dpar import IDparRepository
+import redis.asyncio as aioredis
+
+from app.domain.entities.dpar import Event
+from app.domain.repositories.dpar import IEventBus
 
 
-class RedisDparRepository(IDparRepository):
-    def __init__(self, client: redis.Redis) -> None:
+class RedisEventBus(IEventBus):
+    def __init__(self, client: aioredis.Redis) -> None:
         self._client = client
 
-    def get(self, key: str) -> Dpar | None:
-        value = self._client.get(key)
-        if value is None:
-            return None
-        ttl = self._client.ttl(key)
-        return Dpar(key=key, value=value, ttl=ttl if ttl >= 0 else None)
+    async def publish(self, channel: str, payload: dict) -> Event:
+        event = Event(channel=channel, payload=payload)
+        message = json.dumps(
+            {
+                "event_id": event.event_id,
+                "timestamp": event.timestamp.isoformat(),
+                "payload": event.payload,
+            }
+        )
+        await self._client.publish(channel, message)
+        return event
 
-    def set(self, key: str, value: str, ttl: int | None = None) -> Dpar:
-        if ttl is not None:
-            self._client.setex(key, ttl, value)
-        else:
-            self._client.set(key, value)
-        return Dpar(key=key, value=value, ttl=ttl)
-
-    def delete(self, key: str) -> bool:
-        return bool(self._client.delete(key))
-
-    def keys(self, pattern: str = "*") -> list[str]:
-        return [k for k in self._client.scan_iter(pattern)]
+    async def subscribe(self, channel: str) -> AsyncIterator[Event]:  # type: ignore[override]
+        pubsub = self._client.pubsub()
+        await pubsub.subscribe(channel)
+        try:
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    data = json.loads(message["data"])
+                    yield Event(
+                        channel=channel,
+                        payload=data["payload"],
+                        event_id=data["event_id"],
+                        timestamp=datetime.fromisoformat(data["timestamp"]),
+                    )
+        finally:
+            await pubsub.unsubscribe(channel)
+            await pubsub.aclose()

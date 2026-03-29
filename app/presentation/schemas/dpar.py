@@ -1,17 +1,14 @@
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel
 
 
-class DparSet(BaseModel):
-    value: str
-    ttl: int | None = Field(default=None, description="有効期限（秒）。省略時は無期限")
+class EventPublish(BaseModel):
+    payload: dict
 
 
-class DparResponse(BaseModel):
-    key: str
-    value: str
-    ttl: int | None = Field(description="残り TTL（秒）。None は無期限")
-
-
-class DparKeysResponse(BaseModel):
-    keys: list[str]
-    count: int
+class EventResponse(BaseModel):
+    channel: str
+    payload: dict
+    event_id: str
+    timestamp: datetime
