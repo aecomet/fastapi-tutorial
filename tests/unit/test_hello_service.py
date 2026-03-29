@@ -1,4 +1,4 @@
-from app.services.root import ROUTES, RootResponse, build_root_response
+from app.presentation.schemas.root import ROUTES, RootResponse, build_root_response
 
 
 def test_build_root_response_message():

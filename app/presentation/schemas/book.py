@@ -1,8 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
-
-from app.schemas.author import AuthorResponse
+from pydantic import BaseModel
 
 
 class BookBase(BaseModel):
@@ -27,10 +25,13 @@ class BookUpdate(BaseModel):
     author_id: int | None = None
 
 
-class BookResponse(BookBase):
-    model_config = ConfigDict(from_attributes=True)
-
+class BookResponse(BaseModel):
     id: int
+    title: str
+    isbn: str | None
+    published_year: int | None
+    genre: str | None
+    summary: str | None
+    author_id: int
     created_at: datetime
     updated_at: datetime
-    author: AuthorResponse

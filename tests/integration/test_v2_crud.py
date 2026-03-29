@@ -4,8 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models  # noqa: F401 — Base.metadata にモデルを登録
-from app.database import Base, get_db
+import app.infrastructure.models  # noqa: F401 — Base.metadata にモデルを登録
+from app.infrastructure.database import Base, get_db
 from app.main import app
 
 TEST_DATABASE_URL = "sqlite://"  # インメモリ SQLite
@@ -109,7 +109,7 @@ def test_create_book(client: TestClient):
     assert res.status_code == 201
     body = res.json()
     assert body["title"] == "吾輩は猫である"
-    assert body["author"]["id"] == author["id"]
+    assert body["author_id"] == author["id"]
 
 
 def test_create_book_invalid_author(client: TestClient):

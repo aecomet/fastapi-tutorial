@@ -6,7 +6,6 @@ from app.config import get_settings
 _settings = get_settings()
 DATABASE_URL = _settings.database_url
 
-# SQLite の場合は check_same_thread を無効化
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)

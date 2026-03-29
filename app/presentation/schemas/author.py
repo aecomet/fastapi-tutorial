@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 
 class AuthorBase(BaseModel):
@@ -17,8 +17,8 @@ class AuthorUpdate(BaseModel):
     bio: str | None = None
 
 
-class AuthorResponse(AuthorBase):
-    model_config = ConfigDict(from_attributes=True)
-
+class AuthorResponse(BaseModel):
     id: int
+    name: str
+    bio: str | None
     created_at: datetime

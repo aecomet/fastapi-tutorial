@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.services.root import RootResponse, build_root_response
+from app.presentation.schemas.root import RootResponse, build_root_response
 
 router = APIRouter()
 

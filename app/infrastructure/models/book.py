@@ -3,10 +3,10 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.infrastructure.database import Base
 
 
-class Book(Base):
+class BookModel(Base):
     __tablename__ = "books"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -25,4 +25,4 @@ class Book(Base):
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    author: Mapped[Author] = relationship("Author", back_populates="books")  # noqa: F821
+    author: Mapped[AuthorModel] = relationship("AuthorModel", back_populates="books")  # noqa: F821

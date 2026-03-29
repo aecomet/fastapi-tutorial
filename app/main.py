@@ -9,8 +9,8 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.middleware import RequestLoggingMiddleware
-from app.routers import authors, books, health, root
-from app.routers.health import set_startup_complete
+from app.presentation.routers import authors, books, health, root
+from app.presentation.routers.health import set_startup_complete
 
 # APP_ENV に応じたログ設定を適用（uvicorn のログ設定より後に実行されるため上書き可能）
 _settings = get_settings()
@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    from app.database import Base, engine
+    import app.infrastructure.models  # noqa: F401 — Base.metadata にモデルを登録
+    from app.infrastructure.database import Base, engine
 
     Base.metadata.create_all(bind=engine)
     set_startup_complete()
