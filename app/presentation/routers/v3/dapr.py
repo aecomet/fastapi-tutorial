@@ -1,12 +1,12 @@
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends
 
-from app.application.use_cases.dpar import EventUseCase
+from app.application.use_cases.dapr import EventUseCase
 from app.infrastructure.redis import get_async_redis
-from app.infrastructure.repositories.dpar import RedisEventBus
-from app.presentation.schemas.dpar import EventPublish, EventResponse
+from app.infrastructure.repositories.dapr import RedisEventBus
+from app.presentation.schemas.dapr import EventPublish, EventResponse
 
-router = APIRouter(prefix="/dpar", tags=["dpar"])
+router = APIRouter(prefix="/dapr", tags=["dapr"])
 
 
 def get_event_use_case(client: aioredis.Redis = Depends(get_async_redis)) -> EventUseCase:

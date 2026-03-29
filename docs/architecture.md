@@ -56,18 +56,18 @@ fastapi-tutorial/
 │   │   ├── entities/
 │   │   │   ├── author.py               # Author dataclass
 │   │   │   ├── book.py                 # Book dataclass
-│   │   │   └── dpar.py                 # Event dataclass
+│   │   │   └── dapr.py                 # Event dataclass
 │   │   ├── repositories/
 │   │   │   ├── author.py               # IAuthorRepository (ABC)
 │   │   │   ├── book.py                 # IBookRepository (ABC)
-│   │   │   └── dpar.py                 # IEventBus (ABC)
+│   │   │   └── dapr.py                 # IEventBus (ABC)
 │   │   └── exceptions.py               # NotFoundError
 │   │
 │   ├── application/                     # アプリケーション層
 │   │   └── use_cases/
 │   │       ├── author.py               # AuthorUseCase
 │   │       ├── book.py                 # BookUseCase
-│   │       └── dpar.py                 # EventUseCase
+│   │       └── dapr.py                 # EventUseCase
 │   │
 │   ├── infrastructure/                  # インフラ層
 │   │   ├── database.py                 # SQLAlchemy engine / SessionLocal / get_db()
@@ -78,7 +78,7 @@ fastapi-tutorial/
 │   │   └── repositories/
 │   │       ├── author.py               # SqlAlchemyAuthorRepository
 │   │       ├── book.py                 # SqlAlchemyBookRepository
-│   │       └── dpar.py                 # RedisEventBus（redis.asyncio）
+│   │       └── dapr.py                 # RedisEventBus（redis.asyncio）
 │   │
 │   └── presentation/                   # プレゼンテーション層
 │       ├── schemas/
@@ -94,7 +94,7 @@ fastapi-tutorial/
 │           │   ├── authors.py          # CRUD /api/v2/authors
 │           │   └── books.py            # CRUD /api/v2/books
 │           └── v3/
-│               └── dpar.py             # Pub/Sub /api/v3/dpar（publish のみ）
+│               └── dpar.py             # Pub/Sub /api/v3/dapr（publish のみ）
 │
 ├── workers/                             # 非同期バックグラウンドワーカー
 │   ├── base.py                         # BaseWorker（ABC）
@@ -104,7 +104,7 @@ fastapi-tutorial/
 │   ├── integration/
 │   │   ├── test_root_endpoint.py       # v1 エンドポイント統合テスト
 │   │   ├── test_v2_crud.py             # v2 CRUD 統合テスト
-│   │   └── test_v3_dpar.py             # v3 dpar Publish 統合テスト
+│   │   └── test_v3_dpar.py             # v3 dapr Publish 統合テスト
 │   └── unit/
 │       ├── test_event_worker.py        # EventWorker 単体テスト
 │       ├── test_health_service.py
@@ -175,7 +175,7 @@ fastapi-tutorial/
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| POST | `/api/v3/dpar/{channel}/publish` | チャンネルにイベントを Publish |
+| POST | `/api/v3/dapr/{channel}/publish` | チャンネルにイベントを Publish |
 
 > **Subscribe はエンドポイントではなくバックグラウンドワーカーで処理する。**  
 > `EventWorker` が `DPAR_WORKER_CHANNEL`（デフォルト: `events`）を Subscribe し、  
@@ -207,12 +207,12 @@ POST /api/v2/authors/
   ▼ RequestLoggingMiddleware（レスポンスステータスをログ出力）
 ```
 
-## リクエストフロー（v3 dpar 例）
+## リクエストフロー（v3 dapr 例）
 
 ```
-POST /api/v3/dpar/{channel}/publish
+POST /api/v3/dapr/{channel}/publish
   │
-  ▼ FastAPI ルーティング → presentation/routers/v3/dpar.py
+  ▼ FastAPI ルーティング → presentation/routers/v3/dapr.py
   ▼ get_event_use_case() DI（get_async_redis → RedisEventBus）
   ▼ EventUseCase.publish(channel, payload)
   ▼ RedisEventBus.publish() → Redis PUBLISH

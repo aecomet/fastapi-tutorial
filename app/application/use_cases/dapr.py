@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 
-from app.domain.entities.dpar import Event
-from app.domain.repositories.dpar import IEventBus
+from app.domain.entities.dapr import Event
+from app.domain.repositories.dapr import IEventBus
 
 
 class EventUseCase:

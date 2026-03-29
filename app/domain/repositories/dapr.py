@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
-from app.domain.entities.dpar import Event
+from app.domain.entities.dapr import Event
 
 
 class IEventBus(ABC):

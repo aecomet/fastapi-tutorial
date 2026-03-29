@@ -2,8 +2,8 @@ import logging
 
 import redis.asyncio as aioredis
 
-from app.application.use_cases.dpar import EventUseCase
-from app.infrastructure.repositories.dpar import RedisEventBus
+from app.application.use_cases.dapr import EventUseCase
+from app.infrastructure.repositories.dapr import RedisEventBus
 from app.workers.base import BaseWorker
 
 logger = logging.getLogger(__name__)

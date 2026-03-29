@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
-from app.workers.dpar import EventWorker
+from app.workers.dapr import EventWorker
 
 
 def make_redis_mock() -> MagicMock:
@@ -60,7 +60,7 @@ async def test_event_worker_logs_consumed_event():
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     worker = EventWorker(channel="test-ch", redis_client=client)
 
-    with patch("app.workers.dpar.logger") as mock_logger:
+    with patch("app.workers.dapr.logger") as mock_logger:
         task = asyncio.create_task(worker.run())
         await asyncio.sleep(0.05)
 

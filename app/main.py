@@ -14,7 +14,7 @@ from app.middleware import RequestLoggingMiddleware
 from app.presentation.routers.v1 import health, root
 from app.presentation.routers.v1.health import set_startup_complete
 from app.presentation.routers.v2 import authors, books
-from app.presentation.routers.v3 import dpar
+from app.presentation.routers.v3 import dapr
 
 # APP_ENV に応じたログ設定を適用（uvicorn のログ設定より後に実行されるため上書き可能）
 _settings = get_settings()
@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     import app.infrastructure.models  # noqa: F401 — Base.metadata にモデルを登録
     from app.infrastructure.database import Base, engine
-    from app.workers.dpar import EventWorker
+    from app.workers.dapr import EventWorker
 
     Base.metadata.create_all(bind=engine)
     set_startup_complete()
 
     redis_client = aioredis.Redis.from_url(_settings.redis_url, decode_responses=True)
-    worker = EventWorker(channel=_settings.dpar_worker_channel, redis_client=redis_client)
+    worker = EventWorker(channel=_settings.dapr_worker_channel, redis_client=redis_client)
     task = asyncio.create_task(worker.run())
 
     yield
@@ -55,4 +55,4 @@ app.include_router(root.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(authors.router, prefix="/api/v2")
 app.include_router(books.router, prefix="/api/v2")
-app.include_router(dpar.router, prefix="/api/v3")
+app.include_router(dapr.router, prefix="/api/v3")
