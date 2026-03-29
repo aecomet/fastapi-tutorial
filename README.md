@@ -31,6 +31,12 @@ docker compose up
 
 ```bash
 curl http://127.0.0.1:8000/
+
+# Pub/Sub publish
+curl -X POST -H "Content-Type: application/json" -d '{"payload": {"msg": "hello pubsub"}}' http://127.0.0.1:8000/api/v3/dapr/events/publish
+
+# Streams publish
+curl -X POST -H "Content-Type: application/json" -d '{"payload": {"msg": "hello stream"}}' http://127.0.0.1:8000/api/v3/dapr/streams/events_stream/publish
 ```
 
 | URL | 内容 |

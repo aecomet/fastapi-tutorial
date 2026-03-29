@@ -32,18 +32,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     import app.infrastructure.models  # noqa: F401 — Base.metadata にモデルを登録
     from app.infrastructure.database import Base, engine
     from app.workers.dapr import EventWorker
+    from app.workers.streams import StreamWorker
 
     Base.metadata.create_all(bind=engine)
     set_startup_complete()
 
     redis_client = aioredis.Redis.from_url(_settings.redis_url, decode_responses=True)
     worker = EventWorker(channel=_settings.dapr_worker_channel, redis_client=redis_client)
+    stream_worker = StreamWorker(stream=_settings.streams_worker_channel, redis_client=redis_client)
     task = asyncio.create_task(worker.run())
+    stream_task = asyncio.create_task(stream_worker.run())
 
     yield
 
     task.cancel()
-    await asyncio.gather(task, return_exceptions=True)
+    stream_task.cancel()
+    await asyncio.gather(task, stream_task, return_exceptions=True)
     await redis_client.aclose()
 
 
@@ -56,3 +60,4 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(authors.router, prefix="/api/v2")
 app.include_router(books.router, prefix="/api/v2")
 app.include_router(dapr.router, prefix="/api/v3")
+

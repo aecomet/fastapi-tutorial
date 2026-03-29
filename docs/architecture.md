@@ -9,7 +9,7 @@
 | データバリデーション・設定管理 | Pydantic / pydantic-settings | (FastAPI 依存 / >=2.13.1) |
 | ORM | SQLAlchemy | >=2.0.48 |
 | DB ドライバー | PyMySQL | >=1.1.2 |
-| KV ストア・Pub/Sub | Redis | >=7.4.0 |
+| KV ストア・Pub/Sub/Streams | Redis | >=7.4.0 |
 | コンテナ | Docker + Docker Compose | - |
 | パッケージ管理 | uv | - |
 | 言語 | Python | >=3.14 |
@@ -28,8 +28,10 @@ presentation ──→ application ──→ domain ←── infrastructure
 |---------|------|------|---------|
 | **Domain** | `app/domain/` | エンティティ・リポジトリ抽象・例外定義 | なし（純粋 Python） |
 | **Application** | `app/application/` | ユースケース（ビジネスロジック） | Domain のみ |
-| **Infrastructure** | `app/infrastructure/` | DB・Redis の具体実装 | SQLAlchemy・redis-py |
-| **Presentation** | `app/presentation/` | FastAPI ルーター・スキーマ | Application・Infrastructure |
+| **Infrastructure** | `app/infrastructure/` | DB・Redis の具体実装（Pub/Sub, Streams両対応） | SQLAlchemy・redis-py |
+| **Presentation** | `app/presentation/` | FastAPI ルーター・スキーマ（/dapr, /dapr/streams など） | Application・Infrastructure |
+| **Workers** | `app/workers/` | EventWorker（Pub/Sub）, StreamWorker（Streams） | redis-py |
+
 
 ## ディレクトリ構成
 
@@ -38,6 +40,12 @@ fastapi-tutorial/
 ├── .github/
 │   ├── copilot-instructions.md          # Copilot 共通指示
 │   └── instructions/
+├── app/
+│   ├── workers/
+│   │   ├── base.py                      # BaseWorker (ABC)
+│   │   ├── dpar.py                      # EventWorker (Pub/Sub)
+│   │   └── streams.py                   # StreamWorker (Streams)
+
 │       └── fastapi-review.instructions.md
 │
 ├── app/
@@ -171,15 +179,18 @@ fastapi-tutorial/
 | PUT | `/api/v2/books/{id}` | 書籍更新 |
 | DELETE | `/api/v2/books/{id}` | 書籍削除 |
 
-### v3 — Dpar イベントバス（Redis Pub/Sub）
+### v3 — Dapr/Streams イベントバス（Redis Pub/Sub/Streams）
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| POST | `/api/v3/dapr/{channel}/publish` | チャンネルにイベントを Publish |
+| POST | `/api/v3/dapr/{channel}/publish` | Pub/Sub: チャンネルにイベントを Publish |
+| POST | `/api/v3/dapr/streams/{stream}/publish` | Streams: ストリームにイベントを XADD |
 
-> **Subscribe はエンドポイントではなくバックグラウンドワーカーで処理する。**  
+> **Subscribe/Consume はエンドポイントではなくバックグラウンドワーカーで処理する。**  
 > `EventWorker` が `DPAR_WORKER_CHANNEL`（デフォルト: `events`）を Subscribe し、  
-> 受信イベントをログ出力する。追加チャンネルを購読したい場合は `lifespan` にワーカーを追加する。
+> 受信イベントをログ出力する。  
+> `StreamWorker` が `STREAMS_WORKER_CHANNEL`（デフォルト: `events_stream`）を XREAD し、  
+> 新規イベントをログ出力する。
 
 
 ### API ドキュメント（自動生成）
@@ -233,6 +244,7 @@ EventWorker（asyncio.Task、lifespan で起動）
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis 接続文字列 |
 | `LOG_LEVEL` | `INFO` | ログレベル |
 | `DPAR_WORKER_CHANNEL` | `events` | EventWorker が Subscribe するチャンネル名 |
+| `STREAMS_WORKER_CHANNEL` | `events_stream` | StreamWorker が XREAD するストリーム名 |
 
 ## K8s Probe 設定例
 

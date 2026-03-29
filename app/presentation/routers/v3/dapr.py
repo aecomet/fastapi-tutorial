@@ -8,6 +8,22 @@ from app.presentation.schemas.dapr import EventPublish, EventResponse
 
 router = APIRouter(prefix="/dapr", tags=["dapr"])
 
+# Redis Streams publish endpoint (統合)
+@router.post(
+    "/streams/{stream}/publish",
+    response_model=dict,  # Streamsはevent_idのみ返す
+    summary="Redis Streamsにイベント追加",
+    description="指定ストリームにイベントをXADDで追加する。"
+)
+async def publish_stream_event(
+    stream: str,
+    data: EventPublish,
+    redis: aioredis.Redis = Depends(get_async_redis),
+):
+    import json
+    event_id = await redis.xadd(stream, {"payload": json.dumps(data.payload)})
+    return {"stream": stream, "event_id": event_id}
+
 
 def get_event_use_case(client: aioredis.Redis = Depends(get_async_redis)) -> EventUseCase:
     return EventUseCase(bus=RedisEventBus(client))

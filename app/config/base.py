@@ -13,3 +13,4 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     log_level: str = "INFO"
     dapr_worker_channel: str = "events"
+    streams_worker_channel: str = "events_stream"
