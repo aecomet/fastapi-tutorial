@@ -12,6 +12,7 @@ from app.middleware import RequestLoggingMiddleware
 from app.presentation.routers.v1 import health, root
 from app.presentation.routers.v1.health import set_startup_complete
 from app.presentation.routers.v2 import authors, books
+from app.presentation.routers.v3 import dpar
 
 # APP_ENV に応じたログ設定を適用（uvicorn のログ設定より後に実行されるため上書き可能）
 _settings = get_settings()
@@ -42,3 +43,4 @@ app.include_router(root.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(authors.router, prefix="/api/v2")
 app.include_router(books.router, prefix="/api/v2")
+app.include_router(dpar.router, prefix="/api/v3")
