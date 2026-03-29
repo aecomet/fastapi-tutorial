@@ -21,6 +21,12 @@ docker compose up
 
 ホットリロード対応のため、コードの変更は自動的に反映されます。
 
+> **依存パッケージを変更した場合は再ビルドが必要です**
+> ```bash
+> docker compose build
+> docker compose up
+> ```
+
 ## 動作確認
 
 ```bash

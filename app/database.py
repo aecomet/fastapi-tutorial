@@ -1,12 +1,10 @@
-import os
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./fastapi_dev.db",  # ローカル開発・テスト用フォールバック
-)
+from app.config import get_settings
+
+_settings = get_settings()
+DATABASE_URL = _settings.database_url
 
 # SQLite の場合は check_same_thread を無効化
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
